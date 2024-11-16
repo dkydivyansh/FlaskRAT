@@ -1,7 +1,7 @@
 # FlaskRAT
 
 <p align='center'>
-<img src="./logo.png" width=200 alt="FlaskRAT Logo"/>
+<img src="./Logo.png" width=200 alt="FlaskRAT Logo"/>
 </p>
 
 FlaskRAT is a powerful and efficient Remote Access Tool (RAT) designed for secure, encrypted remote monitoring and control of computers. Built with Python, it is lightweight yet robust, offering a wide range of functionalities tailored for administrators, support staff, and businesses seeking a reliable remote administration solution.
